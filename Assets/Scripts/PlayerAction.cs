@@ -8,4 +8,7 @@ public class PlayerAction
     public float posZ;
     public float rotY;
     public int moveState; // 0=idle, 1=walk, 2=run
+    public bool didJump;
+    public bool isEquipped;
+    public bool didAttack;
 }

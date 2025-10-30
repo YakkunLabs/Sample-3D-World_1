@@ -51,5 +51,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Sample 3D World.sln"
+    "dotnet.defaultSolution": "Sample-3D-World_1.sln"
 }

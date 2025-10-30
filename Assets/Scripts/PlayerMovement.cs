@@ -4,9 +4,11 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     public float moveSpeed = 3.0f;
-    public float runSpeed = 7.0f; // <-- NEW
+    public float runSpeed = 7.0f;
     public float lookSpeed = 2.0f;
     public float lookXLimit = 80.0f;
+    public float jumpForce = 8.0f; 
+    public float gravity = 20.0f;
 
     private CharacterController controller;
     private Camera playerCamera;
@@ -14,12 +16,15 @@ public class PlayerMovement : MonoBehaviour
     private float rotationX = 0;
 
     private Animator animator;
-
-    // --- NEW: For Network Actions ---
-    public NetworkClient networkClient; // Assign in Inspector
+    public NetworkClient networkClient;
     private float actionTimer;
-    private float actionSendRate = 0.05f; // 20 times per second
-    
+    private float actionSendRate = 0.05f;
+
+    private bool justJumped = false; 
+    public GameObject swordObject; 
+    private bool isSwordEquipped = false;
+    private bool justAttacked = false;
+
     void Start()
     {
         controller = GetComponent<CharacterController>();
@@ -28,6 +33,9 @@ public class PlayerMovement : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        if (swordObject != null)
+            swordObject.SetActive(false);
     }
 
     void Update()
@@ -36,37 +44,79 @@ public class PlayerMovement : MonoBehaviour
         Vector3 forward = transform.TransformDirection(Vector3.forward);
         Vector3 right = transform.TransformDirection(Vector3.right);
 
-        // --- MODIFIED: Check for run key ---
         bool isRunning = Input.GetKey(KeyCode.LeftShift);
         float currentSpeed = isRunning ? runSpeed : moveSpeed;
 
-        float curSpeedX = currentSpeed * Input.GetAxis("Vertical"); // W/S keys
-        float curSpeedY = currentSpeed * Input.GetAxis("Horizontal"); // A/D keys
+        // Get Horizontal/Vertical input
+        float curSpeedX = currentSpeed * Input.GetAxis("Vertical");
+        float curSpeedY = currentSpeed * Input.GetAxis("Horizontal");
         
+        // --- MODIFIED: Gravity and Jump Logic ---
+        // We preserve the Y-axis speed from last frame
+        float moveDirectionY = moveDirection.y;
+        
+        // Set X and Z movement
         moveDirection = (forward * curSpeedX) + (right * curSpeedY);
 
-        // Apply gravity
-        if (!controller.isGrounded)
+        // Check if we are on the ground
+        if (controller.isGrounded)
         {
-            moveDirection.y -= 9.81f * Time.deltaTime;
+            // If grounded, check for jump button
+            // "Jump" is Spacebar by default
+            if (Input.GetButtonDown("Jump"))
+            {
+                moveDirection.y = jumpForce; // Apply jump force
+                animator.SetTrigger("Jump"); // Tell animator
+                justJumped = true; // Tell network
+            }
+            else
+            {
+                // If we are grounded and NOT jumping, Y speed is 0
+                moveDirection.y = 0;
+            }
+        }
+        else
+        {
+            // If in the air, restore Y speed and apply gravity
+            moveDirection.y = moveDirectionY;
+            moveDirection.y -= gravity * Time.deltaTime;
         }
 
         // Move the controller
         controller.Move(moveDirection * Time.deltaTime);
+        // ------------------------------------------
 
-        // --- MODIFIED: UPDATE ANIMATOR ---
+        // --- UPDATE ANIMATOR ---
         if (animator != null)
         {
-            int currentMoveState = 0;
-            bool isMoving = (curSpeedX != 0 || curSpeedY != 0);
-
-            if (isMoving)
+            // Only set walking/running if on the ground
+            if (controller.isGrounded)
             {
-                currentMoveState = isRunning ? 2 : 1; // 2=run, 1=walk
+                int currentMoveState = 0;
+                bool isMoving = (curSpeedX != 0 || curSpeedY != 0);
+
+                if (isMoving)
+                {
+                    currentMoveState = isRunning ? 2 : 1;
+                }
+
+                animator.SetInteger("moveState", currentMoveState);
             }
-            
-            animator.SetInteger("moveState", currentMoveState);
         }
+        
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            isSwordEquipped = !isSwordEquipped; // Toggle
+            swordObject.SetActive(isSwordEquipped);
+        }
+
+        // Attack (Left Mouse)
+        if (Input.GetMouseButtonDown(0) && isSwordEquipped) // 0 is Left Click
+        {
+            animator.SetTrigger("Attack");
+            justAttacked = true; // Tell network
+        }
+
 
         // --- Send Action Data over Network ---
         actionTimer += Time.deltaTime;
@@ -86,20 +136,25 @@ public class PlayerMovement : MonoBehaviour
 
     void SendActionData()
     {
-        // 1. Create the action data object
         PlayerAction action = new PlayerAction();
         action.posX = transform.position.x;
         action.posY = transform.position.y;
         action.posZ = transform.position.z;
         action.rotY = transform.eulerAngles.y; 
-        
-        // --- MODIFIED ---
         action.moveState = animator.GetInteger("moveState");
 
-        // 2. Convert to JSON
-        string json = JsonUtility.ToJson(action);
+        //  Send the jump event ---
+        action.didJump = justJumped;
 
-        // 3. Send to network (with a prefix to identify it)
+        action.isEquipped = isSwordEquipped;
+        action.didAttack = justAttacked;
+
+        // Reset the event so we only send it once
+        justJumped = false; 
+        justAttacked = false;
+        // -------------------------------
+
+        string json = JsonUtility.ToJson(action);
         networkClient.SendActionData("ACTION:" + json);
     }
 }
