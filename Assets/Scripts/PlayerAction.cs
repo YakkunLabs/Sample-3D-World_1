@@ -1,5 +1,5 @@
-// This isn't a MonoBehaviour, it's just a data container.
-// [System.Serializable] lets Unity's JsonUtility convert it.
+using UnityEngine;
+
 [System.Serializable]
 public class PlayerAction
 {
@@ -8,7 +8,11 @@ public class PlayerAction
     public float posZ;
     public float rotY;
     public int moveState; // 0=idle, 1=walk, 2=run
-    public bool didJump;
-    public bool isEquipped;
-    public bool didAttack;
+    public bool didJump; 
+    
+    // --- THIS IS THE CORRECTED PART ---
+    public int equippedWeapon; // 0=unarmed, 1=sword, 2=pistol
+    public int attackType;     // 0=none, 1=sword_attack, 2=pistol_attack
+    public bool isAiming;
+    public Vector3 fireDirection;
 }
