@@ -12,7 +12,7 @@ public class Bullet : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         
         // Make the bullet fly forward
-        rb.velocity = transform.forward * speed;
+        rb.linearVelocity = transform.forward * speed;
 
         // Destroy the bullet after 'lifetime' seconds
         Destroy(gameObject, lifetime);
