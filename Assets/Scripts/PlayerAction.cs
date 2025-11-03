@@ -7,7 +7,8 @@ public class PlayerAction
     public float posY;
     public float posZ;
     public float rotY;
-    public int moveState; // 0=idle, 1=walk, 2=run
+    public float moveX;
+    public float moveY;
     public bool didJump; 
     
     // --- THIS IS THE CORRECTED PART ---

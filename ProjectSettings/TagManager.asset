@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - InteractableScreen
+  - Destructible
   layers:
   - Default
   - TransparentFX

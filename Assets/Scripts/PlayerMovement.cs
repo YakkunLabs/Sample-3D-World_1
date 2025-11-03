@@ -21,8 +21,12 @@ public class PlayerMovement : MonoBehaviour
     public NetworkClient networkClient; 
     public GameObject swordObject;
     public GameObject weapon2Object; // Pistol
-    public GameObject bulletPrefab; 
+    public LaserSight pistolLaser;
+    public GameObject bulletPrefab;
     public Transform pistolMuzzle; 
+    public float meleeRange = 2f;
+    public float swordDamage = 25f;
+    public float axeDamage = 35f;
     
     // Private Components
     private CharacterController controller;
@@ -68,15 +72,24 @@ public class PlayerMovement : MonoBehaviour
 
     void HandleMovement()
     {
+        // --- Basic Input ---
+        float horizontalInput = Input.GetAxis("Horizontal"); // A/D keys (-1 to +1)
+        float verticalInput = Input.GetAxis("Vertical");   // W/S keys (-1 to +1)
+        bool isRunning = Input.GetKey(KeyCode.LeftShift);
+
+        // --- Movement Vector for CharacterController ---
+        float currentMoveSpeed = isRunning ? runSpeed : moveSpeed;
         Vector3 forward = transform.TransformDirection(Vector3.forward);
         Vector3 right = transform.TransformDirection(Vector3.right);
-        bool isRunning = Input.GetKey(KeyCode.LeftShift);
-        float currentSpeed = isRunning ? runSpeed : moveSpeed;
-        float curSpeedX = currentSpeed * Input.GetAxis("Vertical");
-        float curSpeedY = currentSpeed * Input.GetAxis("Horizontal");
-        float moveDirectionY = moveDirection.y;
-        moveDirection = (forward * curSpeedX) + (right * curSpeedY);
+        
+        // Use full speed for controller
+        float speedForward = currentMoveSpeed * verticalInput;
+        float speedRight = currentMoveSpeed * horizontalInput;
+        float moveDirectionY = moveDirection.y; // Save gravity/jump
+        
+        moveDirection = (forward * speedForward) + (right * speedRight);
 
+        // --- Jump & Gravity Logic ---
         if (controller.isGrounded)
         {
             if (Input.GetButtonDown("Jump"))
@@ -97,23 +110,27 @@ public class PlayerMovement : MonoBehaviour
         }
         controller.Move(moveDirection * Time.deltaTime);
 
-        // --- UPDATE ANIMATOR ---
+        // --- NEW ANIMATOR LOGIC ---
         if (animator != null)
         {
-            if (controller.isGrounded)
+            // This is the animator's speed, not the character's.
+            // 0 = idle, 1 = walk, 2 = run.
+            float animationSpeed = 0f;
+
+            // Check if we are moving at all
+            if (verticalInput != 0 || horizontalInput != 0)
             {
-                int currentMoveState = 0;
-                bool isMoving = (curSpeedX != 0 || curSpeedY != 0);
-                if (isMoving)
-                {
-                    currentMoveState = isRunning ? 2 : 1;
-                }
-                animator.SetInteger("moveState", currentMoveState);
+                animationSpeed = isRunning ? 2.0f : 1.0f;
             }
+            
+            // Send the final values to the animator
+            // When no keys are pressed, horizontal/verticalInput are 0, so this sends (0, 0)
+            animator.SetFloat("moveX", horizontalInput * animationSpeed);
+            animator.SetFloat("moveY", verticalInput * animationSpeed);
+            
             animator.SetInteger("equippedWeapon", equippedWeaponState);
         }
     }
-
     void HandleWeaponInput()
     {
         // Equip Sword (Key 1)
@@ -141,6 +158,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 animator.SetTrigger("Attack_Sword");
                 justAttackedType = 1;
+                DoMeleeAttackCheck(swordDamage);
             }
             else if (equippedWeaponState == 2) // Pistol
             {
@@ -224,6 +242,14 @@ public class PlayerMovement : MonoBehaviour
             swordObject.SetActive(state == 1);
         if (weapon2Object != null)
             weapon2Object.SetActive(state == 2);
+
+            if (pistolLaser != null)
+        {
+            // Enable the laser script only if the pistol (2) is active
+            pistolLaser.enabled = (state == 2); 
+            // Also enable/disable the LineRenderer component itself
+            pistolLaser.GetComponent<LineRenderer>().enabled = (state == 2);
+        }
     }
 
     void SendActionData()
@@ -232,8 +258,9 @@ public class PlayerMovement : MonoBehaviour
         action.posX = transform.position.x;
         action.posY = transform.position.y;
         action.posZ = transform.position.z;
-        action.rotY = transform.eulerAngles.y; 
-        action.moveState = animator.GetInteger("moveState");
+        action.rotY = transform.eulerAngles.y;
+        action.moveX = animator.GetFloat("moveX");
+        action.moveY = animator.GetFloat("moveY");
         action.didJump = justJumped;
         action.equippedWeapon = equippedWeaponState;
         action.attackType = justAttackedType;
@@ -245,10 +272,30 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // Reset one-shot events
-        justJumped = false; 
-        justAttackedType = 0; 
-        
+        justJumped = false;
+        justAttackedType = 0;
+
         string json = JsonUtility.ToJson(action);
         networkClient.SendActionData("ACTION:" + json);
+    }
+    
+    // This function performs a melee attack
+    void DoMeleeAttackCheck(float damage)
+    {
+        Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0)); // Ray from center of screen
+        RaycastHit hit;
+
+        // Check if we hit something within melee range
+        if (Physics.Raycast(ray, out hit, meleeRange))
+        {
+            if (hit.collider.CompareTag("Destructible"))
+            {
+                DestructibleTarget target = hit.collider.GetComponent<DestructibleTarget>();
+                if (target != null)
+                {
+                    target.TakeDamage(damage);
+                }
+            }
+        }
     }
 }

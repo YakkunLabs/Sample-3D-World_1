@@ -21,13 +21,23 @@ public class Bullet : MonoBehaviour
     // This runs when the bullet hits another object (if it's a trigger)
     void OnTriggerEnter(Collider other)
     {
+        // Check if we hit a destructible target
+        if (other.CompareTag("Destructible"))
+        {
+            DestructibleTarget target = other.GetComponent<DestructibleTarget>();
+            if (target != null)
+            {
+                target.TakeDamage(10f); // Pistol deals 10 damage
+            }
+        }
+
         // Don't hit the player who fired it
         if (other.CompareTag("Player"))
         {
             return;
         }
 
-        // For now, just destroy the bullet when it hits anything
+        // Destroy the bullet when it hits anything
         Destroy(gameObject);
     }
 }
