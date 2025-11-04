@@ -55,6 +55,7 @@ public class DuplicateController : MonoBehaviour
         animator.SetFloat("moveY", action.moveY);
         animator.SetInteger("equippedWeapon", action.equippedWeapon);
         animator.SetBool("isAiming", action.isAiming);
+        animator.SetBool("isKneeling", action.isKneeling);
 
         // Jump Event
         if (action.didJump)

@@ -16,4 +16,5 @@ public class PlayerAction
     public int attackType;     // 0=none, 1=sword_attack, 2=pistol_attack
     public bool isAiming;
     public Vector3 fireDirection;
+    public bool isKneeling;
 }

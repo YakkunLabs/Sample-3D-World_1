@@ -86,8 +86,16 @@ public class PlayerMovement : MonoBehaviour
         float speedForward = currentMoveSpeed * verticalInput;
         float speedRight = currentMoveSpeed * horizontalInput;
         float moveDirectionY = moveDirection.y; // Save gravity/jump
-        
+
         moveDirection = (forward * speedForward) + (right * speedRight);
+        
+        if (animator.GetBool("isKneeling"))
+        {
+            // If kneeling, force idle animation
+            animator.SetFloat("moveX", 0);
+            animator.SetFloat("moveY", 0);
+            return; 
+        }
 
         // --- Jump & Gravity Logic ---
         if (controller.isGrounded)
@@ -149,7 +157,16 @@ public class PlayerMovement : MonoBehaviour
             UpdateWeaponVisibility(equippedWeaponState);
 
             if (crosshairUI != null)
-            crosshairUI.SetActive(equippedWeaponState > 0);
+                crosshairUI.SetActive(equippedWeaponState > 0);
+        }
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            // We can only kneel if a pistol is out (state > 1)
+            // and we are on the ground
+            if (controller.isGrounded && equippedWeaponState > 1)
+            {
+                animator.SetBool("isKneeling", !animator.GetBool("isKneeling"));
+            }
         }
         // Attack (Left Mouse)
         if (Input.GetMouseButtonDown(0))
@@ -265,6 +282,7 @@ public class PlayerMovement : MonoBehaviour
         action.equippedWeapon = equippedWeaponState;
         action.attackType = justAttackedType;
         action.isAiming = animator.GetBool("isAiming");
+        action.isKneeling = animator.GetBool("isKneeling");
 
         if (justAttackedType == 2)
         {
